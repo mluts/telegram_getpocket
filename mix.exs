@@ -40,7 +40,10 @@ defmodule Tggp.Mixfile do
       {:phoenix_html, "~> 2.10"},
       {:phoenix_live_reload, "~> 1.0", only: :dev},
       {:gettext, "~> 0.11"},
-      {:cowboy, "~> 1.0"}
+      {:cowboy, "~> 1.0"},
+      {:httpoison, "~> 1.1"},
+      {:nadia, "~> 0.4.4"},
+      {:poolboy, "~> 1.5"}
     ]
   end
 

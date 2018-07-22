@@ -17,6 +17,7 @@ defmodule TggpWeb.Router do
     pipe_through :browser # Use the default browser stack
 
     get "/", PageController, :index
+    get "/getpocket/:user_id/auth_done", GetpocketController, :auth_done
   end
 
   # Other scopes may use custom stacks.

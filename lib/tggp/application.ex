@@ -7,15 +7,17 @@ defmodule Tggp.Application do
     import Supervisor.Spec
 
     # Define workers and child supervisors to be supervised
+
     children = [
       # Start the Ecto repository
-      supervisor(Tggp.Repo, []),
+      {Tggp.Repo, []},
       # Start the endpoint when the application starts
-      supervisor(TggpWeb.Endpoint, []),
+      {TggpWeb.Endpoint, []},
       # Start your own worker by calling: Tggp.Worker.start_link(arg1, arg2, arg3)
       # worker(Tggp.Worker, [arg1, arg2, arg3]),
+      {Tggp.Bot.Poller, []},
+      {Tggp.Bot.Server, []}
     ]
-
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options
     opts = [strategy: :one_for_one, name: Tggp.Supervisor]

@@ -56,3 +56,6 @@ config :tggp, Tggp.Repo,
   database: "tggp_dev",
   hostname: "localhost",
   pool_size: 10
+
+config :tggp, Tggp.Getpocket,
+  consumer_key: System.get_env("GETPOCKET_CONSUMER_KEY")
