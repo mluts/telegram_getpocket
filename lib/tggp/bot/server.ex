@@ -1,6 +1,7 @@
 defmodule Tggp.Bot.Server do
   @dump_period_ms 5 * 60 * 1000
   @cache_purge_period_ms @dump_period_ms
+  @check_subscriptions_period_ms 60 * 1000
 
   require Logger
 
@@ -65,6 +66,32 @@ defmodule Tggp.Bot.Server do
       end
     end
 
+    def schedule_user_event(table, user_id, key, future_time) do
+      :ets.insert(table, {{user_id, :schedule, key}, future_time})
+    end
+
+    def get_scheduled_user_events(table) do
+      ms = {
+        {{:"$1", :schedule, :"$2"}, :"$3"},
+        [],
+        [{{:"$1", :"$2", :"$3"}}]
+      }
+      :ets.select(table, [ms])
+    end
+
+    def delete_schedule(table, user_id, key) do
+      :ets.delete(table, {user_id, :schedule, key})
+    end
+
+    def delete_user_schedules(table, user_id) do
+      ms = {
+        {{user_id, :schedule, :"$_"}, :"$_"},
+        [],
+        [true]
+      }
+      :ets.select_delete(table, [ms])
+    end
+
     def cached(table, key, cached_fn) when is_binary(key) and is_function(cached_fn, 0) do
       stale_cache_time = time_ms() - @cache_ttl_ms
 
@@ -114,6 +141,7 @@ defmodule Tggp.Bot.Server do
     Logger.info "Starting #{__MODULE__}"
     schedule_dump()
     schedule_purge_cache()
+    schedule_check_subscriptions()
     {:ok, %{table: State.init}}
   end
 
@@ -182,26 +210,91 @@ defmodule Tggp.Bot.Server do
 
   def handle_cast({:command, "/rand", %Message{chat: chat, from: user}}, %{table: t} = state) do
     case State.get_getpocket(t, user.id) do
-      %Getpocket{access_token: at} ->
-        article = State.cached(t, "articles_for_rand:#{user.id}", fn ->
-          GP.get_articles(at, count: 2000)
-        end)
-        |> Enum.random
-
+      %Getpocket{access_token: at} when is_binary(at) ->
+        case get_cached_article(user.id, t) do
+          {:ok, _chat_id, article} ->
+            Nadia.send_message(
+              chat.id,
+              "#{article.title}\n#{Article.getpocket_url(article)}"
+            )
+          {:error, _reason} ->
+            Nadia.send_message(
+              chat.id,
+              "Something went wrong, maybe try this /rand again?"
+            )
+        end
+      _ ->
         Nadia.send_message(
           chat.id,
-          "#{article.title}\n#{Article.getpocket_url(article)}"
+          "Maybe subscribe first?"
         )
-      _ -> nil
+        nil
     end
 
     {:noreply, state}
   end
 
-  def handle_cast(req, _state) do
+  def handle_cast({:command, "/daily" = cmd, %Message{chat: chat, from: user, text: text}}, %{table: t} = state) do
+    case State.get_getpocket(t, user.id) do
+      %Getpocket{access_token: at} when is_binary(at) ->
+        case String.split(text, " ") do
+          [^cmd, time | _] ->
+            case Timex.parse(time, "{h24}:{m}") do
+              {:ok, %{hour: h, minute: m, second: s}} ->
+                now = in_user_timezone(user.id, Timex.now)
+                today = %{ now | hour: h, minute: m, second: s}
+                tomorrow = Timex.shift(today, days: 1)
+                winner_time = if today > now, do: today, else: tomorrow
+
+                State.schedule_user_event(t, user.id, :daily_getpocket_random, winner_time)
+                Nadia.send_message(chat.id, "Ok, i'll send you an article every day at #{time}")
+
+              {:error, _reason} ->
+                Nadia.send_message(chat.id, "I didn't understand, try again")
+            end
+
+          _ ->
+            Nadia.send_message(chat.id, "I didn't understand, try again")
+        end
+      _ ->
+        Nadia.send_message(chat.id, "First of all, connect your getpocket account here")
+    end
+
+    {:noreply, state}
+  end
+
+  def handle_cast({:command, "/unsubscribe", %Message{chat: chat, from: user}}, %{table: t} = state) do
+    State.delete_user_schedules(t, user.id)
+    Nadia.send_message(chat.id, "Ok, unsubscribing you...")
+    {:noreply, state}
+  end
+
+  def handle_cast({:schedule, user_id, :daily_getpocket_random = key, time}, %{table: t} = state) do
+    now = in_user_timezone(user_id, Timex.now)
+
+    if time < now do
+      case get_cached_article(user_id, t) do
+        {:error, _reason} ->
+          State.delete_schedule(t, user_id, key)
+
+        {:ok, chat_id, article} ->
+          Nadia.send_message(
+            chat_id,
+            "#{article.title}\n#{Article.getpocket_url(article)}"
+          )
+          next_day = %{Timex.shift(now, days: 1) | hour: time.hour, minute: time.minute}
+          State.schedule_user_event(t, user_id, key, next_day)
+      end
+    end
+
+    {:noreply, state}
+  end
+
+  def handle_cast(req, state) do
     Logger.debug(fn ->
       "Unknown message: #{inspect(req)}"
     end)
+    {:noreply, state}
   end
 
   def handle_info(:dump, %{table: t} = state) do
@@ -218,6 +311,15 @@ defmodule Tggp.Bot.Server do
     {:noreply, state}
   end
 
+  def handle_info(:check_subscriptions, %{table: t} = state) do
+    Logger.debug "Checking subscriptions"
+    for {user_id, event_key, datetime} <- State.get_scheduled_user_events(t) do
+      GenServer.cast(__MODULE__, {:schedule, user_id, event_key, datetime})
+    end
+    schedule_check_subscriptions()
+    {:noreply, state}
+  end
+
   def schedule_dump do
     Logger.debug "Scheduling bot-server ets dump"
     Process.send_after(self(), :dump, @dump_period_ms)
@@ -228,9 +330,37 @@ defmodule Tggp.Bot.Server do
     Process.send_after(self(), :purge_cache, @cache_purge_period_ms)
   end
 
+  def schedule_check_subscriptions do
+    Logger.debug "Scheduling subscriptions check"
+    Process.send_after(self(), :check_subscriptions, @check_subscriptions_period_ms)
+  end
+
   def terminate(_reason, %{table: t}) do
     Logger.info "Terminating..."
     Logger.info "Dump database before terminate"
     State.dump(t)
+  end
+
+  defp get_cached_article(user_id, table) do
+    case State.get_chat(table, user_id) do
+      nil ->
+        {:error, :no_chat_found}
+
+      %Chat{id: chat_id} ->
+        case State.get_getpocket(table, user_id) do
+          %Getpocket{access_token: at} ->
+            article = State.cached(table, "articles_for_rand:#{user_id}", fn ->
+              GP.get_articles(at, count: 2000)
+            end) |> Enum.random
+            {:ok, chat_id, article}
+          _ ->
+            {:error, :no_getpocket_access_key}
+        end
+    end
+  end
+
+  defp in_user_timezone(_user_id, time) do
+    tz = Timex.Timezone.local()
+    Timex.Timezone.convert(time, tz)
   end
 end

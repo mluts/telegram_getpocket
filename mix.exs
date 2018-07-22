@@ -43,7 +43,8 @@ defmodule Tggp.Mixfile do
       {:cowboy, "~> 1.0"},
       {:httpoison, "~> 1.1"},
       {:nadia, "~> 0.4.4"},
-      {:poolboy, "~> 1.5"}
+      {:poolboy, "~> 1.5"},
+      {:timex, "~> 3.3"}
     ]
   end
 
