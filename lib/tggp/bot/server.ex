@@ -8,8 +8,9 @@ defmodule Tggp.Bot.Server do
   alias Getpocket.Api.Article
   alias Tggp.Getpocket, as: GP
 
-  use GenServer
   import TggpWeb.Router.Helpers
+
+  use GenServer
 
   defmodule Getpocket do
     defstruct request_token: nil, redirect_uri: nil, access_token: nil
@@ -64,11 +65,11 @@ defmodule Tggp.Bot.Server do
       end
     end
 
-    def cached(table, cache_name, cached_fn) when is_atom(cache_name) and is_function(cached_fn, 0) do
+    def cached(table, key, cached_fn) when is_binary(key) and is_function(cached_fn, 0) do
       stale_cache_time = time_ms() - @cache_ttl_ms
 
       ms = {
-        {{:"$1", :cache, cache_name}, :"$2"},
+        {{:"$1", :cache, key}, :"$2"},
         [{:is_integer, :"$1"}, {:>, :"$1", stale_cache_time}],
         [{{:ok, :"$2"}}]
       }
@@ -78,7 +79,7 @@ defmodule Tggp.Bot.Server do
           content
         [] ->
           content = cached_fn.()
-          :ets.insert(table, {{time_ms(), :cache, cache_name}, content})
+          :ets.insert(table, {{time_ms(), :cache, key}, content})
           content
       end
     end
@@ -99,7 +100,17 @@ defmodule Tggp.Bot.Server do
     defp time_ms, do: System.system_time(:millisecond)
   end
 
+  def child_spec([]) do
+    %{
+      id: __MODULE__,
+      start: {__MODULE__, :start_link, [[]]},
+      type: :worker,
+      shutdown: 5000
+    }
+  end
+
   def init(_args) do
+    Process.flag(:trap_exit, true)
     Logger.info "Starting #{__MODULE__}"
     schedule_dump()
     schedule_purge_cache()
@@ -108,6 +119,10 @@ defmodule Tggp.Bot.Server do
 
   def start_link([]) do
     GenServer.start_link(__MODULE__, [], name: __MODULE__)
+  end
+
+  def handle_call(:terminate, _from, state) do
+    {:stop, :normal, :ok, state}
   end
 
   def handle_call({:auth_done, user_id}, _from, %{table: t} = state) when is_integer(user_id) do
@@ -168,7 +183,7 @@ defmodule Tggp.Bot.Server do
   def handle_cast({:command, "/rand", %Message{chat: chat, from: user}}, %{table: t} = state) do
     case State.get_getpocket(t, user.id) do
       %Getpocket{access_token: at} ->
-        article = State.cached(t, :articles_for_rand, fn ->
+        article = State.cached(t, "articles_for_rand:#{user.id}", fn ->
           GP.get_articles(at, count: 2000)
         end)
         |> Enum.random
@@ -211,5 +226,11 @@ defmodule Tggp.Bot.Server do
   def schedule_purge_cache do
     Logger.debug "Scheduling bot-server cache purge"
     Process.send_after(self(), :purge_cache, @cache_purge_period_ms)
+  end
+
+  def terminate(_reason, %{table: t}) do
+    Logger.info "Terminating..."
+    Logger.info "Dump database before terminate"
+    State.dump(t)
   end
 end
