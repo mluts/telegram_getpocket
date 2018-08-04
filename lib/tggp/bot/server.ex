@@ -10,6 +10,8 @@ defmodule Tggp.Bot.Server do
   alias Tggp.Getpocket, as: GP
 
   import TggpWeb.Router.Helpers
+  require Tggp.Gettext
+  import Tggp.Gettext
 
   use GenServer
 
@@ -20,13 +22,14 @@ defmodule Tggp.Bot.Server do
   defmodule State do
     @cache_ttl_ms 30 * 60 * 1000
 
-    def dump_path, do:
-    Path.join(:code.priv_dir(:tggp), "bot_server_state.ets") |> String.to_charlist
+    def dump_path,
+      do: Path.join(:code.priv_dir(:tggp), "bot_server_state.ets") |> String.to_charlist()
 
     def init do
       case :ets.file2tab(dump_path()) do
         {:ok, table} ->
           table
+
         {:error, {:read_error, {:file_error, _, :enoent}}} ->
           :ets.new(:bot_server_state, [:private])
       end
@@ -36,14 +39,12 @@ defmodule Tggp.Bot.Server do
       :ok = :ets.tab2file(table, dump_path())
     end
 
-    def put_user(table, %User{id: id} = user), do:
-    :ets.insert(table, {{id, :user}, user})
+    def put_user(table, %User{id: id} = user), do: :ets.insert(table, {{id, :user}, user})
 
-    def put_getpocket(table, user_id, %Getpocket{} = gp), do:
-    :ets.insert(table, {{user_id, :getpocket}, gp})
+    def put_getpocket(table, user_id, %Getpocket{} = gp),
+      do: :ets.insert(table, {{user_id, :getpocket}, gp})
 
-    def put_chat(table, user_id, %Chat{} = chat), do:
-    :ets.insert(table, {{user_id, :chat}, chat})
+    def put_chat(table, user_id, %Chat{} = chat), do: :ets.insert(table, {{user_id, :chat}, chat})
 
     def get_user(table, id) do
       case :ets.lookup(table, {id, :user}) do
@@ -76,6 +77,7 @@ defmodule Tggp.Bot.Server do
         [],
         [{{:"$1", :"$2", :"$3"}}]
       }
+
       :ets.select(table, [ms])
     end
 
@@ -89,6 +91,7 @@ defmodule Tggp.Bot.Server do
         [],
         [true]
       }
+
       :ets.select_delete(table, [ms])
     end
 
@@ -102,8 +105,9 @@ defmodule Tggp.Bot.Server do
       }
 
       case :ets.select(table, [ms]) do
-        [{:ok, content} ] ->
+        [{:ok, content}] ->
           content
+
         [] ->
           content = cached_fn.()
           :ets.insert(table, {{time_ms(), :cache, key}, content})
@@ -116,12 +120,24 @@ defmodule Tggp.Bot.Server do
 
       ms = {
         {{:"$1", :cache, :"$_"}, :"$_"},
-        [{:is_integer, :"$1"},
-         {:<, :"$1", stale_cache_time}],
+        [{:is_integer, :"$1"}, {:<, :"$1", stale_cache_time}],
         [true]
       }
 
       :ets.select_delete(table, [ms])
+    end
+
+    def update_user_state(table, user_id, map) when is_map(map) do
+      state = get_user_state(table, user_id)
+      new_state = Map.merge(state, map)
+      :ets.insert(table, {{user_id, :state}, new_state})
+    end
+
+    def get_user_state(table, user_id) do
+      case :ets.lookup(table, {user_id, :state}) do
+        [{_key, state}] -> state
+        [] -> %{}
+      end
     end
 
     defp time_ms, do: System.system_time(:millisecond)
@@ -138,11 +154,11 @@ defmodule Tggp.Bot.Server do
 
   def init(_args) do
     Process.flag(:trap_exit, true)
-    Logger.info "Starting #{__MODULE__}"
+    Logger.info("Starting #{__MODULE__}")
     schedule_dump()
     schedule_purge_cache()
     schedule_check_subscriptions()
-    {:ok, %{table: State.init}}
+    {:ok, %{table: State.init()}}
   end
 
   def start_link([]) do
@@ -159,12 +175,12 @@ defmodule Tggp.Bot.Server do
 
     case GP.get_access_token(rt) do
       {:ok, %{"access_token" => at}} ->
-        Nadia.send_message(chat.id, "Yass. I'm in, now linked getpocket!")
+        Nadia.send_message(chat.id, dgettext("server", "got getpocket access key"))
         State.put_getpocket(t, user_id, %Getpocket{access_token: at})
 
       {:error, reason} ->
         Logger.warn("Can't get access token: #{inspect(reason)}")
-        Nadia.send_message(chat.id, "Can't get access token :( Lets try again")
+        Nadia.send_message(chat.id, dgettext("server", "failed to get getpocket access key"))
     end
 
     {:reply, :ok, state}
@@ -175,7 +191,7 @@ defmodule Tggp.Bot.Server do
       %Getpocket{access_token: token} when is_binary(token) ->
         Nadia.send_message(
           chat.id,
-          "Already connected your getpocket. Want some article?"
+          dgettext("server", "already have getpocket access key")
         )
 
         State.put_user(t, user)
@@ -184,21 +200,28 @@ defmodule Tggp.Bot.Server do
       _ ->
         Nadia.send_message(
           chat.id,
-          "Hi, i'm not connected to your getpocket account, so let's do it. Preparing a link for you"
+          dgettext("server", "connecting getpocket and sending auth link for you")
         )
 
         redirect_uri = getpocket_url(TggpWeb.Endpoint, :auth_done, user.id)
 
-        getpocket = case GP.get_request_token(redirect_uri) do
-          {:ok, request_token} ->
-            link = GP.get_authorization_url(request_token, redirect_uri)
-            Nadia.send_message(chat.id, "Here is your link: #{link}")
-            %Getpocket{request_token: request_token, redirect_uri: redirect_uri}
-          {:error, reason} ->
-            Logger.error("Failed to obtain request token: #{reason}")
-            Nadia.send_message(chat.id, "Something went wrong :( lets try again")
-            nil
-        end
+        getpocket =
+          case GP.get_request_token(redirect_uri) do
+            {:ok, request_token} ->
+              link = GP.get_authorization_url(request_token, redirect_uri)
+
+              Nadia.send_message(
+                chat.id,
+                dgettext("server", "here is your link %{link}", link: link)
+              )
+
+              %Getpocket{request_token: request_token, redirect_uri: redirect_uri}
+
+            {:error, reason} ->
+              Logger.error("Failed to obtain request token: #{reason}")
+              Nadia.send_message(chat.id, dgettext("server", "something went wrong, try again"))
+              nil
+          end
 
         State.put_user(t, user)
         State.put_chat(t, user.id, chat)
@@ -213,64 +236,101 @@ defmodule Tggp.Bot.Server do
       %Getpocket{access_token: at} when is_binary(at) ->
         case get_cached_article(user.id, t) do
           {:ok, _chat_id, article} ->
+            State.update_user_state(t, user.id, %{
+              last_article: article,
+              last_article_at: in_user_timezone(user.id, Timex.now())
+            })
+
             Nadia.send_message(
               chat.id,
               "#{article.title}\n#{Article.getpocket_url(article)}"
             )
+
           {:error, _reason} ->
             Nadia.send_message(
               chat.id,
-              "Something went wrong, maybe try this /rand again?"
+              dgettext("server", "failed to get article, try again")
             )
         end
+
       _ ->
         Nadia.send_message(
           chat.id,
-          "Maybe subscribe first?"
+          dgettext("server", "can't get article while not linked")
         )
+
         nil
     end
 
     {:noreply, state}
   end
 
-  def handle_cast({:command, "/daily" = cmd, %Message{chat: chat, from: user, text: text}}, %{table: t} = state) do
+  def handle_cast(
+        {:command, "/daily" = cmd, %Message{chat: chat, from: user, text: text}},
+        %{table: t} = state
+      ) do
     case State.get_getpocket(t, user.id) do
       %Getpocket{access_token: at} when is_binary(at) ->
         case String.split(text, " ") do
           [^cmd, time | _] ->
             case Timex.parse(time, "{h24}:{m}") do
               {:ok, %{hour: h, minute: m, second: s}} ->
-                now = in_user_timezone(user.id, Timex.now)
-                today = %{ now | hour: h, minute: m, second: s}
+                now = in_user_timezone(user.id, Timex.now())
+                today = %{now | hour: h, minute: m, second: s}
                 tomorrow = Timex.shift(today, days: 1)
                 winner_time = if today > now, do: today, else: tomorrow
 
                 State.schedule_user_event(t, user.id, :daily_getpocket_random, winner_time)
-                Nadia.send_message(chat.id, "Ok, i'll send you an article every day at #{time}")
+
+                Nadia.send_message(
+                  chat.id,
+                  dgettext("server", "ok, sending article every day at %{time}", time: time)
+                )
 
               {:error, _reason} ->
-                Nadia.send_message(chat.id, "I didn't understand, try again")
+                Nadia.send_message(chat.id, dgettext("server", "wrong time string"))
             end
 
           _ ->
-            Nadia.send_message(chat.id, "I didn't understand, try again")
+            Nadia.send_message(chat.id, dgettext("server", "wrong time string"))
         end
+
       _ ->
-        Nadia.send_message(chat.id, "First of all, connect your getpocket account here")
+        Nadia.send_message(
+          chat.id,
+          dgettext("server", "cant subscribe while didnt link getpocket")
+        )
     end
 
     {:noreply, state}
   end
 
-  def handle_cast({:command, "/unsubscribe", %Message{chat: chat, from: user}}, %{table: t} = state) do
+  def handle_cast(
+        {:command, "/unsubscribe", %Message{chat: chat, from: user}},
+        %{table: t} = state
+      ) do
     State.delete_user_schedules(t, user.id)
-    Nadia.send_message(chat.id, "Ok, unsubscribing you...")
+    Nadia.send_message(chat.id, dgettext("server", "ok, unsubscribing"))
+    {:noreply, state}
+  end
+
+  def handle_cast({:command, "/archive", %Message{chat: chat, from: user}}, %{table: t} = state) do
+    case {State.get_getpocket(t, user.id), State.get_user_state(t, user.id)} do
+      {%Getpocket{access_token: at}, %{last_article: article}}
+      when is_binary(at) and is_map(article) ->
+        :ok = GP.archive(at, article)
+        Nadia.send_message(chat.id, dgettext("server", "archived article"))
+
+      res ->
+        Logger.warn(inspect(res))
+        Nadia.send_message(chat.id, dgettext("server", "cant archive article"))
+    end
+
     {:noreply, state}
   end
 
   def handle_cast({:schedule, user_id, :daily_getpocket_random = key, time}, %{table: t} = state) do
-    now = in_user_timezone(user_id, Timex.now)
+    now = in_user_timezone(user_id, Timex.now())
 
     if time < now do
       case get_cached_article(user_id, t) do
@@ -278,10 +338,16 @@ defmodule Tggp.Bot.Server do
           State.delete_schedule(t, user_id, key)
 
         {:ok, chat_id, article} ->
+          State.update_user_state(t, user_id, %{
+            last_article: article,
+            last_article_at: in_user_timezone(user_id, Timex.now())
+          })
+
           Nadia.send_message(
             chat_id,
             "#{article.title}\n#{Article.getpocket_url(article)}"
           )
+
           next_day = %{Timex.shift(now, days: 1) | hour: time.hour, minute: time.minute}
           State.schedule_user_event(t, user_id, key, next_day)
       end
@@ -294,50 +360,53 @@ defmodule Tggp.Bot.Server do
     Logger.debug(fn ->
       "Unknown message: #{inspect(req)}"
     end)
+
     {:noreply, state}
   end
 
   def handle_info(:dump, %{table: t} = state) do
-    Logger.info "Dump ets database"
+    Logger.info("Dump ets database")
     State.dump(t)
     schedule_dump()
     {:noreply, state}
   end
 
   def handle_info(:purge_cache, %{table: t} = state) do
-    Logger.info "Purge cache"
+    Logger.info("Purge cache")
     State.purge_cache(t)
     schedule_purge_cache()
     {:noreply, state}
   end
 
   def handle_info(:check_subscriptions, %{table: t} = state) do
-    Logger.debug "Checking subscriptions"
+    Logger.debug("Checking subscriptions")
+
     for {user_id, event_key, datetime} <- State.get_scheduled_user_events(t) do
       GenServer.cast(__MODULE__, {:schedule, user_id, event_key, datetime})
     end
+
     schedule_check_subscriptions()
     {:noreply, state}
   end
 
   def schedule_dump do
-    Logger.debug "Scheduling bot-server ets dump"
+    Logger.debug("Scheduling bot-server ets dump")
     Process.send_after(self(), :dump, @dump_period_ms)
   end
 
   def schedule_purge_cache do
-    Logger.debug "Scheduling bot-server cache purge"
+    Logger.debug("Scheduling bot-server cache purge")
     Process.send_after(self(), :purge_cache, @cache_purge_period_ms)
   end
 
   def schedule_check_subscriptions do
-    Logger.debug "Scheduling subscriptions check"
+    Logger.debug("Scheduling subscriptions check")
     Process.send_after(self(), :check_subscriptions, @check_subscriptions_period_ms)
   end
 
   def terminate(_reason, %{table: t}) do
-    Logger.info "Terminating..."
-    Logger.info "Dump database before terminate"
+    Logger.info("Terminating...")
+    Logger.info("Dump database before terminate")
     State.dump(t)
   end
 
@@ -349,10 +418,14 @@ defmodule Tggp.Bot.Server do
       %Chat{id: chat_id} ->
         case State.get_getpocket(table, user_id) do
           %Getpocket{access_token: at} ->
-            article = State.cached(table, "articles_for_rand:#{user_id}", fn ->
-              GP.get_articles(at, count: 2000)
-            end) |> Enum.random
+            article =
+              State.cached(table, "articles_for_rand:#{user_id}", fn ->
+                GP.get_articles(at, count: 2000)
+              end)
+              |> Enum.random()
+
             {:ok, chat_id, article}
+
           _ ->
             {:error, :no_getpocket_access_key}
         end

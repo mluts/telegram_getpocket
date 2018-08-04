@@ -11,6 +11,7 @@ config :tggp, TggpWeb.Endpoint,
   debug_errors: true,
   code_reloader: true,
   check_origin: false,
+  url: [host: "falcon", port: 4000],
   watchers: [node: ["node_modules/brunch/bin/brunch", "watch", "--stdin",
                     cd: Path.expand("../assets", __DIR__)]]
 
@@ -47,15 +48,6 @@ config :logger, :console, format: "[$level] $message\n"
 # Set a higher stacktrace during development. Avoid configuring such
 # in production as building large stacktraces may be expensive.
 config :phoenix, :stacktrace_depth, 20
-
-# Configure your database
-config :tggp, Tggp.Repo,
-  adapter: Ecto.Adapters.Postgres,
-  username: "postgres",
-  password: "postgres",
-  database: "tggp_dev",
-  hostname: "localhost",
-  pool_size: 10
 
 config :tggp, Tggp.Getpocket,
   consumer_key: System.get_env("GETPOCKET_CONSUMER_KEY")

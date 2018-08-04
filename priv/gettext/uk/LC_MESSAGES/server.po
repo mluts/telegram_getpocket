@@ -1,0 +1,82 @@
+## `msgid`s in this file come from POT (.pot) files.
+##
+## Do not add, change, or remove `msgid`s manually here as
+## they're tied to the ones in the corresponding POT file
+## (with the same domain).
+##
+## Use `mix gettext.extract --merge` or `mix gettext.merge`
+## to merge POT files into PO files.
+msgid ""
+msgstr ""
+"Language: uk\n"
+"Plural-Forms: nplurals=3\n"
+
+#, elixir-format
+#: lib/tggp/bot/server.ex:194
+msgid "already have getpocket access key"
+msgstr "Getpocket вже був підключений"
+
+#, elixir-format
+#: lib/tggp/bot/server.ex:322
+msgid "archived article"
+msgstr "Статтю заархівовано"
+
+#, elixir-format
+#: lib/tggp/bot/server.ex:259
+msgid "can't get article while not linked"
+msgstr "Не можу дістати статю коли getpocket не підключений"
+
+#, elixir-format
+#: lib/tggp/bot/server.ex:326
+msgid "cant archive article"
+msgstr "Не можу заархівувати статтю"
+
+#, elixir-format
+#: lib/tggp/bot/server.ex:301
+msgid "cant subscribe while didnt link getpocket"
+msgstr "Не можу підписати вас поки getpocket не був підключений"
+
+#, elixir-format
+#: lib/tggp/bot/server.ex:203
+msgid "connecting getpocket and sending auth link for you"
+msgstr "Підключаю getpocket, вам прийде посилання для логіну - перейдіть по ньому"
+
+#, elixir-format
+#: lib/tggp/bot/server.ex:252
+msgid "failed to get article, try again"
+msgstr "Не можу дістати статтю, спробуйте знову"
+
+#, elixir-format
+#: lib/tggp/bot/server.ex:183
+msgid "failed to get getpocket access key"
+msgstr "Щось пішло не так, спробуйте знову"
+
+#, elixir-format
+#: lib/tggp/bot/server.ex:178
+msgid "got getpocket access key"
+msgstr "Getpocket було підключено"
+
+#, elixir-format
+#: lib/tggp/bot/server.ex:215
+msgid "here is your link %{link}"
+msgstr "Ось посилання: %{link}"
+
+#, elixir-format
+#: lib/tggp/bot/server.ex:287
+msgid "ok, sending article every day at %{time}"
+msgstr "Добре, надсилатиму вам щодня статтю о %{time}"
+
+#, elixir-format
+#: lib/tggp/bot/server.ex:313
+msgid "ok, unsubscribing"
+msgstr "Добре, відписую вас"
+
+#, elixir-format
+#: lib/tggp/bot/server.ex:222
+msgid "something went wrong, try again"
+msgstr "Щось пішло не так, спробуйте знову"
+
+#, elixir-format
+#: lib/tggp/bot/server.ex:291 lib/tggp/bot/server.ex:295
+msgid "wrong time string"
+msgstr "Неправильний формат часу"

@@ -1,0 +1,81 @@
+## This file is a PO Template file.
+##
+## `msgid`s here are often extracted from source code.
+## Add new translations manually only if they're dynamic
+## translations that can't be statically extracted.
+##
+## Run `mix gettext.extract` to bring this file up to
+## date. Leave `msgstr`s empty as changing them here as no
+## effect: edit them in PO (`.po`) files instead.
+msgid ""
+msgstr ""
+
+#, elixir-format
+#: lib/tggp/bot/server.ex:194
+msgid "already have getpocket access key"
+msgstr ""
+
+#, elixir-format
+#: lib/tggp/bot/server.ex:322
+msgid "archived article"
+msgstr ""
+
+#, elixir-format
+#: lib/tggp/bot/server.ex:259
+msgid "can't get article while not linked"
+msgstr ""
+
+#, elixir-format
+#: lib/tggp/bot/server.ex:326
+msgid "cant archive article"
+msgstr ""
+
+#, elixir-format
+#: lib/tggp/bot/server.ex:301
+msgid "cant subscribe while didnt link getpocket"
+msgstr ""
+
+#, elixir-format
+#: lib/tggp/bot/server.ex:203
+msgid "connecting getpocket and sending auth link for you"
+msgstr ""
+
+#, elixir-format
+#: lib/tggp/bot/server.ex:252
+msgid "failed to get article, try again"
+msgstr ""
+
+#, elixir-format
+#: lib/tggp/bot/server.ex:183
+msgid "failed to get getpocket access key"
+msgstr ""
+
+#, elixir-format
+#: lib/tggp/bot/server.ex:178
+msgid "got getpocket access key"
+msgstr ""
+
+#, elixir-format
+#: lib/tggp/bot/server.ex:215
+msgid "here is your link %{link}"
+msgstr ""
+
+#, elixir-format
+#: lib/tggp/bot/server.ex:287
+msgid "ok, sending article every day at %{time}"
+msgstr ""
+
+#, elixir-format
+#: lib/tggp/bot/server.ex:313
+msgid "ok, unsubscribing"
+msgstr ""
+
+#, elixir-format
+#: lib/tggp/bot/server.ex:222
+msgid "something went wrong, try again"
+msgstr ""
+
+#, elixir-format
+#: lib/tggp/bot/server.ex:291 lib/tggp/bot/server.ex:295
+msgid "wrong time string"
+msgstr ""

@@ -5,6 +5,10 @@ defmodule Getpocket.Api.GetRequest do
   defstruct access_token: nil, consumer_key: nil, count: 10, offset: 0, sort: @sort_newest
 end
 
+defmodule Getpocket.Api.ArchiveRequest do
+  defstruct item_id: nil
+end
+
 defmodule Getpocket.Api.Article do
   defstruct id: nil, title: nil, given_url: nil, raw: %{}
 
@@ -47,5 +51,23 @@ defmodule Getpocket.Api do
             {:error, inspect(reason)}
         end
     end
+  end
+
+  def archive(consumer_key, access_token, %__MODULE__.Article{id: id}) do
+    payload = %{
+      actions: [%{
+        action: "archive",
+        item_id: to_string(id)
+      }],
+
+      consumer_key: consumer_key,
+      access_token: access_token
+    } |> Poison.encode!
+
+    url = %{ @base_uri | path: "/v3/send"}
+
+    {:ok, %HTTPoison.Response{status_code: 200}} =
+      HTTPoison.post(url, payload, @json_headers)
+    :ok
   end
 end

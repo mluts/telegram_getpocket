@@ -8,7 +8,6 @@ defmodule Tggp.Application do
 
     children = [
       # Start the Ecto repository
-      {Tggp.Repo, []},
       # Start the endpoint when the application starts
       {TggpWeb.Endpoint, []},
       # Start your own worker by calling: Tggp.Worker.start_link(arg1, arg2, arg3)
