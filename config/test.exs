@@ -6,5 +6,9 @@ config :tggp, TggpWeb.Endpoint,
   http: [port: 4001],
   server: false
 
+config :tggp,
+  telegram_impl: Tggp.Telegram.Mock,
+  getpocket_impl: Tggp.Getpocket.Mock
+
 # Print only warnings and errors during test
 config :logger, level: :warn

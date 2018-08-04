@@ -1,6 +1,6 @@
 defmodule Getpocket.Api.GetRequest do
   @sort_newest "newest"
-  @sort_oldest "sort_oldest"
+  # @sort_oldest "sort_oldest"
 
   defstruct access_token: nil, consumer_key: nil, count: 10, offset: 0, sort: @sort_newest
 end
@@ -30,6 +30,8 @@ defmodule Getpocket.Api do
   @base_uri URI.parse("https://getpocket.com")
   @json_headers [{"content-type", "application/json; charset=UTF-8"},
                  {"x-accept", "application/json"}]
+
+  @type article :: %__MODULE__.Article{}
 
   def get_articles(consumer_key, access_token, opts \\ []) do
     count = Keyword.get(opts, :count, 10)

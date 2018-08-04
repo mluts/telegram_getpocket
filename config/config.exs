@@ -9,6 +9,9 @@ use Mix.Config
 config :tggp,
   ecto_repos: [Tggp.Repo]
 
+config :tggp, Tggp.Getpocket,
+  consumer_key: System.get_env("GETPOCKET_CONSUMER_KEY")
+
 # Configures the endpoint
 config :tggp, TggpWeb.Endpoint,
   url: [host: "localhost"],

@@ -143,6 +143,9 @@ defmodule Tggp.Bot.Server do
     defp time_ms, do: System.system_time(:millisecond)
   end
 
+  def telegram, do: Application.get_env(:tggp, :telegram_impl)
+  def getpocket, do: Application.get_env(:tggp, :getpocket_impl)
+
   def child_spec([]) do
     %{
       id: __MODULE__,
@@ -173,14 +176,14 @@ defmodule Tggp.Bot.Server do
     %Chat{} = chat = State.get_chat(t, user_id)
     %Getpocket{request_token: rt} = State.get_getpocket(t, user_id)
 
-    case GP.get_access_token(rt) do
+    case getpocket().get_access_token(rt) do
       {:ok, %{"access_token" => at}} ->
-        Nadia.send_message(chat.id, dgettext("server", "got getpocket access key"))
+        telegram().send_message(chat.id, dgettext("server", "got getpocket access key"))
         State.put_getpocket(t, user_id, %Getpocket{access_token: at})
 
       {:error, reason} ->
         Logger.warn("Can't get access token: #{inspect(reason)}")
-        Nadia.send_message(chat.id, dgettext("server", "failed to get getpocket access key"))
+        telegram().send_message(chat.id, dgettext("server", "failed to get getpocket access key"))
     end
 
     {:reply, :ok, state}
@@ -189,7 +192,7 @@ defmodule Tggp.Bot.Server do
   def handle_cast({:command, "/start", %Message{chat: chat, from: user}}, %{table: t} = state) do
     case State.get_getpocket(t, user.id) do
       %Getpocket{access_token: token} when is_binary(token) ->
-        Nadia.send_message(
+        telegram().send_message(
           chat.id,
           dgettext("server", "already have getpocket access key")
         )
@@ -198,7 +201,7 @@ defmodule Tggp.Bot.Server do
         State.put_chat(t, user.id, chat)
 
       _ ->
-        Nadia.send_message(
+        telegram().send_message(
           chat.id,
           dgettext("server", "connecting getpocket and sending auth link for you")
         )
@@ -206,11 +209,11 @@ defmodule Tggp.Bot.Server do
         redirect_uri = getpocket_url(TggpWeb.Endpoint, :auth_done, user.id)
 
         getpocket =
-          case GP.get_request_token(redirect_uri) do
+          case getpocket().get_request_token(redirect_uri) do
             {:ok, request_token} ->
-              link = GP.get_authorization_url(request_token, redirect_uri)
+              link = getpocket().get_authorization_url(request_token, redirect_uri)
 
-              Nadia.send_message(
+              telegram().send_message(
                 chat.id,
                 dgettext("server", "here is your link %{link}", link: link)
               )
@@ -219,7 +222,12 @@ defmodule Tggp.Bot.Server do
 
             {:error, reason} ->
               Logger.error("Failed to obtain request token: #{reason}")
-              Nadia.send_message(chat.id, dgettext("server", "something went wrong, try again"))
+
+              telegram().send_message(
+                chat.id,
+                dgettext("server", "something went wrong, try again")
+              )
+
               nil
           end
 
@@ -241,20 +249,20 @@ defmodule Tggp.Bot.Server do
               last_article_at: in_user_timezone(user.id, Timex.now())
             })
 
-            Nadia.send_message(
+            telegram().send_message(
               chat.id,
               "#{article.title}\n#{Article.getpocket_url(article)}"
             )
 
           {:error, _reason} ->
-            Nadia.send_message(
+            telegram().send_message(
               chat.id,
               dgettext("server", "failed to get article, try again")
             )
         end
 
       _ ->
-        Nadia.send_message(
+        telegram().send_message(
           chat.id,
           dgettext("server", "can't get article while not linked")
         )
@@ -282,21 +290,21 @@ defmodule Tggp.Bot.Server do
 
                 State.schedule_user_event(t, user.id, :daily_getpocket_random, winner_time)
 
-                Nadia.send_message(
+                telegram().send_message(
                   chat.id,
                   dgettext("server", "ok, sending article every day at %{time}", time: time)
                 )
 
               {:error, _reason} ->
-                Nadia.send_message(chat.id, dgettext("server", "wrong time string"))
+                telegram().send_message(chat.id, dgettext("server", "wrong time string"))
             end
 
           _ ->
-            Nadia.send_message(chat.id, dgettext("server", "wrong time string"))
+            telegram().send_message(chat.id, dgettext("server", "wrong time string"))
         end
 
       _ ->
-        Nadia.send_message(
+        telegram().send_message(
           chat.id,
           dgettext("server", "cant subscribe while didnt link getpocket")
         )
@@ -310,7 +318,7 @@ defmodule Tggp.Bot.Server do
         %{table: t} = state
       ) do
     State.delete_user_schedules(t, user.id)
-    Nadia.send_message(chat.id, dgettext("server", "ok, unsubscribing"))
+    telegram().send_message(chat.id, dgettext("server", "ok, unsubscribing"))
     {:noreply, state}
   end
 
@@ -318,12 +326,12 @@ defmodule Tggp.Bot.Server do
     case {State.get_getpocket(t, user.id), State.get_user_state(t, user.id)} do
       {%Getpocket{access_token: at}, %{last_article: article}}
       when is_binary(at) and is_map(article) ->
-        :ok = GP.archive(at, article)
-        Nadia.send_message(chat.id, dgettext("server", "archived article"))
+        :ok = getpocket().archive(at, article)
+        telegram().send_message(chat.id, dgettext("server", "archived article"))
 
       res ->
         Logger.warn(inspect(res))
-        Nadia.send_message(chat.id, dgettext("server", "cant archive article"))
+        telegram().send_message(chat.id, dgettext("server", "cant archive article"))
     end
 
     {:noreply, state}
@@ -343,7 +351,7 @@ defmodule Tggp.Bot.Server do
             last_article_at: in_user_timezone(user_id, Timex.now())
           })
 
-          Nadia.send_message(
+          telegram().send_message(
             chat_id,
             "#{article.title}\n#{Article.getpocket_url(article)}"
           )
@@ -420,7 +428,7 @@ defmodule Tggp.Bot.Server do
           %Getpocket{access_token: at} ->
             article =
               State.cached(table, "articles_for_rand:#{user_id}", fn ->
-                GP.get_articles(at, count: 2000)
+                getpocket().get_articles(at, count: 2000)
               end)
               |> Enum.random()
 

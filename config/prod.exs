@@ -21,6 +21,10 @@ config :tggp, TggpWeb.Endpoint,
 # Do not print debug messages in production
 config :logger, level: :info
 
+config :tggp,
+  telegram_impl: Tggp.Telegram.Impl,
+  getpocket_impl: Tggp.Getpocket.Impl
+
 # ## SSL Support
 #
 # To get SSL working, you will need to add the `https` key

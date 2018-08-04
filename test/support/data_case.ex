@@ -16,21 +16,21 @@ defmodule Tggp.DataCase do
 
   using do
     quote do
-      alias Tggp.Repo
+      # alias Tggp.Repo
 
-      import Ecto
-      import Ecto.Changeset
-      import Ecto.Query
+      # import Ecto
+      # import Ecto.Changeset
+      # import Ecto.Query
       import Tggp.DataCase
     end
   end
 
-  setup tags do
-    :ok = Ecto.Adapters.SQL.Sandbox.checkout(Tggp.Repo)
+  setup _tags do
+    # :ok = Ecto.Adapters.SQL.Sandbox.checkout(Tggp.Repo)
 
-    unless tags[:async] do
-      Ecto.Adapters.SQL.Sandbox.mode(Tggp.Repo, {:shared, self()})
-    end
+    # unless tags[:async] do
+    #   Ecto.Adapters.SQL.Sandbox.mode(Tggp.Repo, {:shared, self()})
+    # end
 
     :ok
   end
@@ -43,11 +43,11 @@ defmodule Tggp.DataCase do
       assert %{password: ["password is too short"]} = errors_on(changeset)
 
   """
-  def errors_on(changeset) do
-    Ecto.Changeset.traverse_errors(changeset, fn {message, opts} ->
-      Enum.reduce(opts, message, fn {key, value}, acc ->
-        String.replace(acc, "%{#{key}}", to_string(value))
-      end)
-    end)
-  end
+  # def errors_on(changeset) do
+  #   Ecto.Changeset.traverse_errors(changeset, fn {message, opts} ->
+  #     Enum.reduce(opts, message, fn {key, value}, acc ->
+  #       String.replace(acc, "%{#{key}}", to_string(value))
+  #     end)
+  #   end)
+  # end
 end

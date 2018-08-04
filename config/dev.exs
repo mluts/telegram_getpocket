@@ -15,6 +15,10 @@ config :tggp, TggpWeb.Endpoint,
   watchers: [node: ["node_modules/brunch/bin/brunch", "watch", "--stdin",
                     cd: Path.expand("../assets", __DIR__)]]
 
+config :tggp,
+  telegram_impl: Tggp.Telegram.Impl,
+  getpocket_impl: Tggp.Getpocket.Impl
+
 # ## SSL Support
 #
 # In order to use HTTPS in development, a self-signed
@@ -48,6 +52,3 @@ config :logger, :console, format: "[$level] $message\n"
 # Set a higher stacktrace during development. Avoid configuring such
 # in production as building large stacktraces may be expensive.
 config :phoenix, :stacktrace_depth, 20
-
-config :tggp, Tggp.Getpocket,
-  consumer_key: System.get_env("GETPOCKET_CONSUMER_KEY")
