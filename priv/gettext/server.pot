@@ -18,7 +18,7 @@ msgstr ""
 #, elixir-format
 #: lib/tggp/bot/server.ex:322
 msgid "archived article"
-msgstr ""
+msgstr "Article was archived"
 
 #, elixir-format
 #: lib/tggp/bot/server.ex:259

@@ -12,11 +12,71 @@ msgstr ""
 "Plural-Forms: nplurals=2\n"
 
 #, elixir-format
-#: lib/tggp/bot/server.ex:176
-msgid "Yass. I'm in, now linked getpocket!"
-msgstr ""
+#: lib/tggp/bot/server.ex:194
+msgid "already have getpocket access key"
+msgstr "Getpocket was already connected"
 
 #, elixir-format
-#: lib/tggp/bot/server.ex:181
-msgid "Can't get access token :( Lets try again"
-msgstr ""
+#: lib/tggp/bot/server.ex:322
+msgid "archived article"
+msgstr "Article was archived"
+
+#, elixir-format
+#: lib/tggp/bot/server.ex:259
+msgid "can't get article while not linked"
+msgstr "Can't get article because getpocket was not connected"
+
+#, elixir-format
+#: lib/tggp/bot/server.ex:326
+msgid "cant archive article"
+msgstr "Can't archive article"
+
+#, elixir-format
+#: lib/tggp/bot/server.ex:301
+msgid "cant subscribe while didnt link getpocket"
+msgstr "Can't subscribe because getpocket was not connected"
+
+#, elixir-format
+#: lib/tggp/bot/server.ex:203
+msgid "connecting getpocket and sending auth link for you"
+msgstr "Connecting getpocket, please follow link in next message"
+
+#, elixir-format
+#: lib/tggp/bot/server.ex:252
+msgid "failed to get article, try again"
+msgstr "Something went wrong, try again"
+
+#, elixir-format
+#: lib/tggp/bot/server.ex:183
+msgid "failed to get getpocket access key"
+msgstr "Something went wrong, try again"
+
+#, elixir-format
+#: lib/tggp/bot/server.ex:178
+msgid "got getpocket access key"
+msgstr "Getpocket was connected!"
+
+#, elixir-format
+#: lib/tggp/bot/server.ex:215
+msgid "here is your link %{link}"
+msgstr "Here is your link: %{link}"
+
+#, elixir-format
+#: lib/tggp/bot/server.ex:287
+msgid "ok, sending article every day at %{time}"
+msgstr "Ok, will send you daily article at %{time}"
+
+#, elixir-format
+#: lib/tggp/bot/server.ex:313
+msgid "ok, unsubscribing"
+msgstr "Ok, unsubscribed you"
+
+#, elixir-format
+#: lib/tggp/bot/server.ex:222
+msgid "something went wrong, try again"
+msgstr "Something went wrong, try again"
+
+#, elixir-format
+#: lib/tggp/bot/server.ex:291 lib/tggp/bot/server.ex:295
+msgid "wrong time string"
+msgstr "Wrong time format"
