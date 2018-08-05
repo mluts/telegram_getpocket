@@ -4,3 +4,4 @@ ExUnit.start()
 
 Mox.defmock(Tggp.Getpocket.Mock, for: Tggp.Getpocket)
 Mox.defmock(Tggp.Telegram.Mock, for: Tggp.Telegram)
+Mox.defmock(Tggp.Bot.Couchdb.Mock, for: Tggp.Bot.Couchdb)

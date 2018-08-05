@@ -23,7 +23,8 @@ config :logger, level: :info
 
 config :tggp,
   telegram_impl: Tggp.Telegram.Impl,
-  getpocket_impl: Tggp.Getpocket.Impl
+  getpocket_impl: Tggp.Getpocket.Impl,
+  bot_couchdb_impl: Tggp.Bot.Couchdb.Impl
 
 # ## SSL Support
 #

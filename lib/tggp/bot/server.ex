@@ -60,6 +60,10 @@ defmodule Tggp.Bot.Server do
       end
     end
 
+    def delete_getpocket(table, id) do
+      true = :ets.delete(table, {id, :getpocket})
+    end
+
     def get_chat(table, id) do
       case :ets.lookup(table, {id, :chat}) do
         [{_key, entry}] -> entry
@@ -336,6 +340,12 @@ defmodule Tggp.Bot.Server do
 
     {:noreply, state}
   end
+
+  # def handle_cast({:command, "/reset", %Message{chat: chat, from: user}}, %{table: t} = state) do
+  #   case {State.get_getpocket(t, user.id), State.get_user_state(t, user.id)} do
+
+  #   end
+  # end
 
   def handle_cast({:schedule, user_id, :daily_getpocket_random = key, time}, %{table: t} = state) do
     now = in_user_timezone(user_id, Timex.now())

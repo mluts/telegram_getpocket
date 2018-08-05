@@ -19,7 +19,7 @@ defmodule Tggp.Mixfile do
   # Type `mix help compile.app` for more information.
   def application do
     [
-      mod: {Tggp.Application, []},
+      mod: {Tggp.Application, [env: Mix.env]},
       extra_applications: [:logger, :runtime_tools]
     ]
   end

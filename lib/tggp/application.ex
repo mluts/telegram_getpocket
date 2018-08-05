@@ -3,18 +3,20 @@ defmodule Tggp.Application do
 
   # See https://hexdocs.pm/elixir/Application.html
   # for more information on OTP Applications
-  def start(_type, _args) do
+  def start(_type, opts) do
     # Define workers and child supervisors to be supervised
 
-    children = [
-      # Start the Ecto repository
-      # Start the endpoint when the application starts
-      {TggpWeb.Endpoint, []},
-      # Start your own worker by calling: Tggp.Worker.start_link(arg1, arg2, arg3)
-      # worker(Tggp.Worker, [arg1, arg2, arg3]),
-      {Tggp.Bot.Poller, []},
-      {Tggp.Bot.Server, []}
-    ]
+    children =
+      case opts[:env] do
+        :test ->
+          [{TggpWeb.Endpoint, []}]
+
+        _ ->
+          [{TggpWeb.Endpoint, []},
+           {Tggp.Bot.Supervisor, []}
+          ]
+      end
+
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options
     opts = [strategy: :one_for_one, name: Tggp.Supervisor]
