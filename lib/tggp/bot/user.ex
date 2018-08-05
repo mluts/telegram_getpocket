@@ -12,6 +12,7 @@ defmodule Tggp.Bot.User do
     @derive {Poison.Encoder, except: ~w(_rev _id)a}
 
     defstruct user_id: nil,
+              chat_id: nil,
               getpocket_access_token: nil,
               getpocket_request_token: nil,
               _rev: nil,
@@ -27,11 +28,16 @@ defmodule Tggp.Bot.User do
       end
     end
 
+    def get_chat_id(state), do: state.chat_id
+    def put_chat_id(state, chat_id), do: %{state | chat_id: chat_id}
+
     def get_getpocket_access_token(%__MODULE__{getpocket_access_token: at}), do: at
 
     def put_getpocket_access_token(state, access_token) do
       Map.put(state, :getpocket_access_token, access_token)
     end
+
+    def get_getpocket_request_token(%__MODULE__{getpocket_request_token: rt}), do: rt
 
     def put_getpocket_request_token(state, request_token) do
       Map.put(state, :getpocket_request_token, request_token)
@@ -58,7 +64,6 @@ defmodule Tggp.Bot.User do
 
     defp put_user_doc(user_id, %__MODULE__{} = doc) when is_integer(user_id) do
       id = user_key(user_id)
-      body = Poison.encode!()
 
       case couchdb().put_document(id, doc._rev, doc) do
         {:ok, %Response{status_code: code, body: body}} when code in [201, 202] ->
@@ -96,17 +101,56 @@ defmodule Tggp.Bot.User do
     Logger.warn("Dismissing message: #{inspect(msg)}")
   end
 
-  @impl true
+  def auth_done(user_id) do
+    pid = ensure_started!(user_id)
+    GenServer.call(pid, :auth_done)
+  end
+
   def init(user_id) do
     Logger.info("Starting user #{user_id}")
     {:ok, State.init(user_id)}
   end
 
-  def handle_cast({:dispatch_message, %Message{text: text} = msg}, state) do
+  # Calls
+
+  def handle_call(:auth_done, _from, state) do
+    case State.get_getpocket_request_token(state) do
+      nil ->
+        {:reply, {:error, :request_token_empty}, state}
+
+      rt ->
+        chat_id = State.get_chat_id(state)
+
+        new_state =
+          case getpocket().get_access_token(rt) do
+            {:ok, %{"access_token" => at}} ->
+              telegram().send_message(chat_id, dgettext("server", "got getpocket access key"))
+              State.put_getpocket_access_token(state, at)
+
+            {:error, reason} ->
+              Logger.warn("Can't get access token: #{inspect(reason)}")
+
+              telegram().send_message(
+                chat_id,
+                dgettext("server", "failed to get getpocket access key")
+              )
+
+              state
+          end
+
+        {:reply, :ok, new_state}
+    end
+  end
+
+  # Casts
+
+  def handle_cast({:dispatch_message, %Message{text: text, chat: chat} = msg}, state) do
     new_state =
       case parse_command(text) do
         cmd when is_binary(cmd) ->
-          handle_command(state, cmd, msg)
+          state
+          |> State.put_chat_id(chat.id)
+          |> handle_command(cmd, msg)
 
         _ ->
           state
