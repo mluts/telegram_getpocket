@@ -5,6 +5,7 @@ defmodule Tggp.Bot.User do
   import TggpWeb.Router.Helpers
 
   alias Tggp.Bot.{UsersRegistry, UserSupervisor}
+  alias Getpocket.Api.Article
   alias Nadia.Model.{User, Message, Update}
   alias HTTPoison.Response
 
@@ -15,6 +16,7 @@ defmodule Tggp.Bot.User do
               chat_id: nil,
               getpocket_access_token: nil,
               getpocket_request_token: nil,
+              getpocket_articles_cache: [],
               _rev: nil,
               _id: nil
 
@@ -26,6 +28,10 @@ defmodule Tggp.Bot.User do
         {:ok, %__MODULE__{} = state} ->
           state
       end
+    end
+
+    def save(state) do
+      put_user_doc(state.user_id, state)
     end
 
     def get_chat_id(state), do: state.chat_id
@@ -41,6 +47,27 @@ defmodule Tggp.Bot.User do
 
     def put_getpocket_request_token(state, request_token) do
       Map.put(state, :getpocket_request_token, request_token)
+    end
+
+    def get_cached_article(state) do
+      %{getpocket_access_token: access_token, getpocket_articles_cache: cache} =
+        state
+
+      case cache do
+        [article | _] ->
+          {:ok, article, state}
+
+        [] ->
+          with {:ok, list} <- getpocket().get_articles(access_token, count: 1000) do
+            case Enum.shuffle(list) |> Enum.take(100) do
+              [] ->
+                {:ok, nil, %{state | getpocket_articles_cache: []}}
+
+              [article | rest_articles] ->
+                {:ok, article, %{state | getpocket_articles_cache: rest_articles}}
+            end
+          end
+      end
     end
 
     defp get_user_doc(user_id) when not is_nil(user_id) do
@@ -75,7 +102,8 @@ defmodule Tggp.Bot.User do
     end
 
     defp couchdb, do: Application.get_env(:tggp, :bot_couchdb_impl)
-    defp user_key(user_id), do: "user_state_#{user_id}"
+    defp getpocket, do: Application.get_env(:tggp, :getpocket_impl)
+    defp user_key(user_id), do: "user_state_" <> to_string(user_id)
   end
 
   def child_spec({:user_id, user_id}) do
@@ -88,7 +116,7 @@ defmodule Tggp.Bot.User do
   end
 
   def start_link({:user_id, user_id}) do
-    GenServer.start_link(__MODULE__, [user_id], name: process_name(user_id))
+    GenServer.start_link(__MODULE__, user_id, name: process_name(user_id))
   end
 
   def dispatch(%Update{message: msg}) when is_map(msg) do
@@ -194,6 +222,45 @@ defmodule Tggp.Bot.User do
             telegram().send_message(
               chat.id,
               dgettext("server", "something went wrong, try again")
+            )
+
+            state
+        end
+    end
+  end
+
+  def handle_command(state, "/rand", %Message{chat: chat, from: _user}) do
+    case State.get_getpocket_access_token(state) do
+      nil ->
+        telegram().send_message(
+          chat.id,
+          dgettext("server", "can't get article while not linked")
+        )
+
+        state
+
+      _ ->
+        case State.get_cached_article(state) do
+          {:ok, nil, state} ->
+            telegram().send_message(
+              chat.id,
+              dgettext("server", "seems like you didn't add any article to getpocket")
+            )
+
+            state
+
+          {:ok, article, state} ->
+            telegram().send_message(
+              chat.id,
+              "#{article.title}\n#{Article.getpocket_url(article)}"
+            )
+
+            state
+
+          {:error, _} ->
+            telegram().send_message(
+              chat.id,
+              dgettext("server", "failed to get article, try again")
             )
 
             state

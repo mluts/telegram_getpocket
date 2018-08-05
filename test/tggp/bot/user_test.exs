@@ -84,4 +84,26 @@ defmodule Tggp.Bot.UserTest do
       :sys.get_state(BotUser.process_name(user.id))
     end
   end
+
+  describe "/rand" do
+    test "sends random article", %{user: user, update: upd} do
+      at = "access token"
+
+      Mox.expect(CouchdbMock, :get_document, 1, fn key ->
+        assert key == "user_state_#{to_string(user.id)}"
+        state = %BotUser.State{getpocket_access_token: at}
+        {:ok, %HTTPoison.Response{status_code: 200, body: Poison.encode!(state)}}
+      end)
+
+      Mox.expect(GetpocketMock, :get_articles, 1, fn ^at, [count: 1000] ->
+        articles = for _ <- (1..10), do: %Getpocket.Api.Article{}
+        {:ok, articles}
+      end)
+
+      Mox.expect(TelegramMock, :send_message, 1, fn _chat_id, _msg -> nil end)
+
+      upd |> put_command("/rand") |> BotUser.dispatch()
+      :sys.get_state(BotUser.process_name(user.id))
+    end
+  end
 end

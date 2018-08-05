@@ -2,7 +2,7 @@ defmodule Getpocket.Api.GetRequest do
   @sort_newest "newest"
   # @sort_oldest "sort_oldest"
 
-  defstruct access_token: nil, consumer_key: nil, count: 10, offset: 0, sort: @sort_newest
+  defstruct access_token: nil, consumer_key: nil, count: 10, offset: 0, sort: @sort_newest, read: false
 end
 
 defmodule Getpocket.Api.ArchiveRequest do
