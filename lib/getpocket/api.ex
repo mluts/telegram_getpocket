@@ -48,7 +48,7 @@ defmodule Getpocket.Api do
       {:ok, %HTTPoison.Response{status_code: 200, body: body}} ->
         case body |> Poison.decode do
           {:ok, %{"list" => articles}} ->
-            Map.values(articles) |> Enum.map(&Getpocket.Api.Article.from_map/1)
+            {:ok, Map.values(articles) |> Enum.map(&Getpocket.Api.Article.from_map/1)}
           {:error, reason} ->
             {:error, inspect(reason)}
         end

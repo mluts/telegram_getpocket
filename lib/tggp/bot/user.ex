@@ -32,6 +32,7 @@ defmodule Tggp.Bot.User do
 
     def save(state) do
       put_user_doc(state.user_id, state)
+      state
     end
 
     def get_chat_id(state), do: state.chat_id
@@ -50,14 +51,15 @@ defmodule Tggp.Bot.User do
     end
 
     def get_cached_article(state) do
-      %{getpocket_access_token: access_token, getpocket_articles_cache: cache} =
-        state
+      %{getpocket_access_token: access_token, getpocket_articles_cache: cache} = state
 
       case cache do
-        [article | _] ->
-          {:ok, article, state}
+        [article | rest_articles] ->
+          {:ok, article, %{state | getpocket_articles_cache: rest_articles}}
 
         [] ->
+          Logger.debug("Getting getpocket articles")
+
           with {:ok, list} <- getpocket().get_articles(access_token, count: 1000) do
             case Enum.shuffle(list) |> Enum.take(100) do
               [] ->
@@ -94,6 +96,7 @@ defmodule Tggp.Bot.User do
 
       case couchdb().put_document(id, doc._rev, doc) do
         {:ok, %Response{status_code: code, body: body}} when code in [201, 202] ->
+          Logger.debug(fn -> "Saved user doc #{user_id}" end)
           {:ok, Poison.decode!(body, as: %__MODULE__{})}
 
         {:ok, %Response{} = resp} ->
@@ -153,7 +156,10 @@ defmodule Tggp.Bot.User do
           case getpocket().get_access_token(rt) do
             {:ok, %{"access_token" => at}} ->
               telegram().send_message(chat_id, dgettext("server", "got getpocket access key"))
-              State.put_getpocket_access_token(state, at)
+
+              state
+              |> State.put_getpocket_access_token(at)
+              |> State.save()
 
             {:error, reason} ->
               Logger.warn("Can't get access token: #{inspect(reason)}")

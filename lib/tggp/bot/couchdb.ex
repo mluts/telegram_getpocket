@@ -16,7 +16,7 @@ defmodule Tggp.Bot.Couchdb.Impl do
   end
 
   @impl true
-  def put_document(id, rev \\ nil, data) when is_map(data) do
+  def put_document(id, rev, data) when is_map(data) do
     with {:ok, body} <- Poison.encode(data) do
       put_document(id, rev, body)
     end
