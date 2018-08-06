@@ -43,7 +43,7 @@ defmodule Tggp.Bot.Poller do
 
       {:error, %Error{} = err} ->
         msg = Error.message(err)
-        Logger.error(msg)
+        Logger.error("getUpdates error: #{inspect(msg)}")
         exit({:shutdown, msg})
     end
   end

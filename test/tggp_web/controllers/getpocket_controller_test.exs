@@ -9,7 +9,6 @@ defmodule TggpWeb.GetpocketControllerTest do
     Mox.verify_on_exit!()
     Mox.set_mox_global()
 
-
     %{
       user_id: user_id
     }
@@ -17,9 +16,15 @@ defmodule TggpWeb.GetpocketControllerTest do
 
   test "GET /getpocket/:user_id/auth_done", %{conn: conn, user_id: user_id} do
     Mox.expect(Tggp.Bot.Couchdb.Mock, :get_document, 1, fn _id ->
-      body = %Tggp.Bot.User.State{getpocket_request_token: "request_token"}
-             |> Poison.encode!()
+      body =
+        %Tggp.Bot.User.State{getpocket_request_token: "request_token", user_id: user_id}
+        |> Poison.encode!()
+
       {:ok, %HTTPoison.Response{status_code: 200, body: body}}
+    end)
+
+    Mox.expect(Tggp.Bot.Couchdb.Mock, :put_document, 1, fn _id, _rev, _doc ->
+      {:ok, %HTTPoison.Response{status_code: 201, body: "{}"}}
     end)
 
     Mox.expect(Tggp.Getpocket.Mock, :get_access_token, 1, fn _rt ->

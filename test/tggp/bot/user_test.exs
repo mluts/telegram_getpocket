@@ -91,8 +91,11 @@ defmodule Tggp.Bot.UserTest do
 
       Mox.expect(CouchdbMock, :get_document, 1, fn key ->
         assert key == "user_state_#{to_string(user.id)}"
-        state = %BotUser.State{getpocket_access_token: at}
+        state = %BotUser.State{getpocket_access_token: at, user_id: user.id}
         {:ok, %HTTPoison.Response{status_code: 200, body: Poison.encode!(state)}}
+      end)
+      Mox.expect(CouchdbMock, :put_document, 1, fn _key, _rev, _doc ->
+        {:ok, %HTTPoison.Response{status_code: 200, body: Poison.encode!(%{})}}
       end)
 
       Mox.expect(GetpocketMock, :get_articles, 1, fn ^at, [count: 1000] ->
@@ -104,6 +107,25 @@ defmodule Tggp.Bot.UserTest do
 
       upd |> put_command("/rand") |> BotUser.dispatch()
       :sys.get_state(BotUser.process_name(user.id))
+    end
+  end
+
+  describe "/daily" do
+    test "creates subscription for random article", %{user: user, update: upd} do
+      at = "access token"
+
+      Mox.expect(CouchdbMock, :get_document, 1, fn key ->
+        assert key == "user_state_#{to_string(user.id)}"
+        state = %BotUser.State{getpocket_access_token: at, user_id: user.id}
+        {:ok, %HTTPoison.Response{status_code: 200, body: Poison.encode!(state)}}
+      end)
+      Mox.expect(CouchdbMock, :put_document, 1, fn _key, _rev, _doc ->
+        {:ok, %HTTPoison.Response{status_code: 200, body: Poison.encode!(%{})}}
+      end)
+
+      upd |> put_command("/daily 11:35") |> BotUser.dispatch()
+      state = :sys.get_state(BotUser.process_name(user.id))
+      assert state.daily_article_schedule == ~T[11:35:00]
     end
   end
 end

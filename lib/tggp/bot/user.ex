@@ -14,9 +14,11 @@ defmodule Tggp.Bot.User do
 
     defstruct user_id: nil,
               chat_id: nil,
+              messages_cache: [],
               getpocket_access_token: nil,
               getpocket_request_token: nil,
               getpocket_articles_cache: [],
+              daily_article_schedule: nil,
               _rev: nil,
               _id: nil
 
@@ -35,19 +37,18 @@ defmodule Tggp.Bot.User do
       state
     end
 
-    def get_chat_id(state), do: state.chat_id
-    def put_chat_id(state, chat_id), do: %{state | chat_id: chat_id}
+    def put_message(state, %Message{message_id: id} = msg) do
+      messages_cache = state.messages_cache
 
-    def get_getpocket_access_token(%__MODULE__{getpocket_access_token: at}), do: at
+      case messages_cache do
+        [] ->
+          %{state | messages_cache: [msg]}
 
-    def put_getpocket_access_token(state, access_token) do
-      Map.put(state, :getpocket_access_token, access_token)
-    end
-
-    def get_getpocket_request_token(%__MODULE__{getpocket_request_token: rt}), do: rt
-
-    def put_getpocket_request_token(state, request_token) do
-      Map.put(state, :getpocket_request_token, request_token)
+        [%Message{message_id: id2} | _rest] ->
+          if id == id2,
+            do: state,
+            else: %{state | messages_cache: [msg | messages_cache] |> Enum.take(50)}
+      end
     end
 
     def get_cached_article(state) do
@@ -77,7 +78,11 @@ defmodule Tggp.Bot.User do
 
       case couchdb().get_document(id) do
         {:ok, %Response{status_code: 200, body: body}} ->
-          {:ok, Poison.decode!(body, as: %__MODULE__{})}
+          {:ok,
+           Poison.decode!(
+             body,
+             as: %__MODULE__{messages_cache: [%Message{}], getpocket_articles_cache: [%Article{}]}
+           )}
 
         {:ok, %Response{status_code: 404}} ->
           {:ok, nil}
@@ -145,20 +150,19 @@ defmodule Tggp.Bot.User do
   # Calls
 
   def handle_call(:auth_done, _from, state) do
-    case State.get_getpocket_request_token(state) do
+    case state.getpocket_request_token do
       nil ->
         {:reply, {:error, :request_token_empty}, state}
 
       rt ->
-        chat_id = State.get_chat_id(state)
+        chat_id = state.chat_id
 
         new_state =
           case getpocket().get_access_token(rt) do
             {:ok, %{"access_token" => at}} ->
               telegram().send_message(chat_id, dgettext("server", "got getpocket access key"))
 
-              state
-              |> State.put_getpocket_access_token(at)
+              %{state | getpocket_access_token: at}
               |> State.save()
 
             {:error, reason} ->
@@ -182,8 +186,8 @@ defmodule Tggp.Bot.User do
     new_state =
       case parse_command(text) do
         cmd when is_binary(cmd) ->
-          state
-          |> State.put_chat_id(chat.id)
+          %{state | chat_id: chat.id}
+          |> State.put_message(msg)
           |> handle_command(cmd, msg)
 
         _ ->
@@ -196,7 +200,7 @@ defmodule Tggp.Bot.User do
   # Commands
 
   def handle_command(state, "/start", %Message{chat: chat, from: user}) do
-    case State.get_getpocket_access_token(state) do
+    case state.getpocket_access_token do
       access_token when is_binary(access_token) ->
         telegram().send_message(
           chat.id,
@@ -220,7 +224,7 @@ defmodule Tggp.Bot.User do
               dgettext("server", "here is your link %{link}", link: link)
             )
 
-            State.put_getpocket_request_token(state, request_token)
+            %{state | getpocket_request_token: request_token}
 
           {:error, reason} ->
             Logger.error("Failed to obtain request token: #{reason}")
@@ -236,7 +240,7 @@ defmodule Tggp.Bot.User do
   end
 
   def handle_command(state, "/rand", %Message{chat: chat, from: _user}) do
-    case State.get_getpocket_access_token(state) do
+    case state.getpocket_access_token do
       nil ->
         telegram().send_message(
           chat.id,
@@ -261,7 +265,7 @@ defmodule Tggp.Bot.User do
               "#{article.title}\n#{Article.getpocket_url(article)}"
             )
 
-            state
+            state |> State.save()
 
           {:error, _} ->
             telegram().send_message(
@@ -274,7 +278,48 @@ defmodule Tggp.Bot.User do
     end
   end
 
+  def handle_command(state, "/daily", %Message{chat: chat, text: text}) do
+    case state.getpocket_access_token do
+      nil ->
+        telegram().send_message(
+          chat.id,
+          dgettext("server", "cant subscribe while didnt link getpocket")
+        )
+
+        state
+
+      _ ->
+        case parse_time(text) do
+          {:ok, %{hour: h, minute: m}} ->
+            %{state | daily_article_schedule: %Time{hour: h, minute: m, second: 0}}
+            |> State.save()
+
+          {:error, _} ->
+            telegram().send_message(
+              chat.id,
+              dgettext("server", "wrong time string")
+            )
+
+            state
+        end
+    end
+  end
+
+  def handle_command(state, cmd, _msg) do
+    Logger.warn("Unhandled command: #{inspect(cmd)}")
+    state
+  end
+
   # Utils
+  defp parse_time(text) do
+    case String.split(text, " ") do
+      [_cmd, time_spec | _rest] ->
+        Timex.parse(time_spec, "{h24}:{m}")
+
+      _ ->
+        {:error, :bad_format}
+    end
+  end
 
   defp parse_command(nil), do: nil
 
