@@ -9,8 +9,35 @@ defmodule Tggp.Bot.User do
   alias Nadia.Model.{User, Message, Update}
   alias HTTPoison.Response
 
+  @daily_articles_check_period_ms 1000 * 60
+
   defmodule State do
     @derive {Poison.Encoder, except: ~w(_rev _id)a}
+
+    defimpl Poison.Decoder, for: __MODULE__ do
+      def decode(value, _opts) do
+        value
+        |> Map.update(:next_daily_article_at, nil, &parse_datetime/1)
+        |> Map.update(:daily_article_schedule, nil, &parse_time/1)
+      end
+
+      defp parse_time(str) do
+        case Timex.parse(str, "{h24}:{m}:{s}") do
+          {:ok, nt} -> nt |> NaiveDateTime.to_time()
+          _ -> nil
+        end
+      end
+
+      defp parse_datetime(str) do
+        case Timex.parse(str, "{ISO:Extended}") do
+          {:ok, dt} ->
+            dt
+
+          _ ->
+            nil
+        end
+      end
+    end
 
     defstruct user_id: nil,
               chat_id: nil,
@@ -19,6 +46,7 @@ defmodule Tggp.Bot.User do
               getpocket_request_token: nil,
               getpocket_articles_cache: [],
               daily_article_schedule: nil,
+              next_daily_article_at: nil,
               _rev: nil,
               _id: nil
 
@@ -81,7 +109,10 @@ defmodule Tggp.Bot.User do
           {:ok,
            Poison.decode!(
              body,
-             as: %__MODULE__{messages_cache: [%Message{}], getpocket_articles_cache: [%Article{}]}
+             as: %__MODULE__{
+               messages_cache: [%Message{}],
+               getpocket_articles_cache: [%Article{}]
+             }
            )}
 
         {:ok, %Response{status_code: 404}} ->
@@ -144,6 +175,7 @@ defmodule Tggp.Bot.User do
 
   def init(user_id) do
     Logger.info("Starting user #{user_id}")
+    schedule_next_articles_check()
     {:ok, State.init(user_id)}
   end
 
@@ -195,6 +227,48 @@ defmodule Tggp.Bot.User do
       end
 
     {:noreply, new_state}
+  end
+
+  # Info
+
+  def handle_info(:check_daily_article, state) do
+    new_state =
+      case {state.daily_article_schedule, state.next_daily_article_at} do
+        {nil, _} ->
+          state
+
+        {_, nil} ->
+          state
+
+        {time, datetime} ->
+          if Timex.after?(Timex.now(), datetime) do
+            try_send_article(state)
+            |> Map.put(:next_daily_article_at, time_to_next_day(time))
+            |> State.save()
+          else
+            state
+          end
+      end
+
+    {:noreply, new_state}
+  end
+
+  defp try_send_article(%{chat_id: chat_id} = state) do
+    case State.get_cached_article(state) do
+      {:ok, nil, new_state} ->
+        new_state
+
+      {:ok, article, new_state} ->
+        telegram().send_message(
+          chat_id,
+          "#{article.title}\n#{Article.getpocket_url(article)}"
+        )
+
+        new_state
+
+      _ ->
+        state
+    end
   end
 
   # Commands
@@ -291,7 +365,13 @@ defmodule Tggp.Bot.User do
       _ ->
         case parse_time(text) do
           {:ok, %{hour: h, minute: m}} ->
-            %{state | daily_article_schedule: %Time{hour: h, minute: m, second: 0}}
+            time = %Time{hour: h, minute: m, second: 0}
+
+            datetime = time_to_next_day(time)
+
+            state
+            |> Map.put(:daily_article_schedule, time)
+            |> Map.put(:next_daily_article_at, datetime)
             |> State.save()
 
           {:error, _} ->
@@ -343,9 +423,21 @@ defmodule Tggp.Bot.User do
     end
   end
 
-  def process_name(user_id) do
-    {:via, Registry, {UsersRegistry, {:user, user_id}}}
+  defp time_to_next_day(%Time{} = t) do
+    Timex.now()
+    |> Timex.shift(days: 1)
+    |> DateTime.truncate(:second)
+    |> Map.merge(Map.take(t, [:hour, :minute]))
   end
+
+  def schedule_next_articles_check do
+    Logger.debug("Scheduling next articles check")
+    Process.send_after(self(), :check_daily_article, @daily_articles_check_period_ms)
+  end
+
+  def process_name(user_id), do: {:via, Registry, {UsersRegistry, process_key(user_id)}}
+
+  def process_key(user_id), do: {:user, user_id}
 
   def telegram, do: Application.get_env(:tggp, :telegram_impl)
   def getpocket, do: Application.get_env(:tggp, :getpocket_impl)

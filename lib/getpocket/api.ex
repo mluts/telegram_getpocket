@@ -10,6 +10,7 @@ defmodule Getpocket.Api.ArchiveRequest do
 end
 
 defmodule Getpocket.Api.Article do
+  @derive Poison.Encoder
   defstruct id: nil, title: nil, given_url: nil, raw: %{}
 
   def from_map(map) when is_map(map) do

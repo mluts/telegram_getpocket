@@ -3,7 +3,6 @@ defmodule Tggp.Bot.Couchdb do
               {:ok, HTTPoison.Response.t()} | {:error, HTTPoison.Error.t()}
   @callback put_document(id :: binary, rev :: binary(), data :: map()) ::
               {:ok, HTTPoison.Response.t()} | {:error, HTTPoison.Error.t()}
-  # @callback user_key(user_id :: integer()) :: binary()
 end
 
 defmodule Tggp.Bot.Couchdb.Impl do
@@ -32,11 +31,6 @@ defmodule Tggp.Bot.Couchdb.Impl do
       post("/_find", body)
     end
   end
-
-  # @impl true
-  # def user_key(user_id) do
-  #   "user_state_#{user_id}"
-  # end
 
   def process_url(url) do
     db_url() <> url
